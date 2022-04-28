@@ -57,10 +57,107 @@ void Algo::SetOutFileName(const std::string &outFile)
     return;
 }
 
+
+bool Algo::SetConfig(const char *args)
+{
+    JiErrorCode ret = ji_update_config(m_predictor, args);
+    if (ret != JISDK_RET_SUCCEED)
+    {
+        LOG(INFO) << "ji_calc_image error, return " << ret;
+        return false;
+    }
+
+    return true;
+}
+
+bool Algo::ProcessImages(const std::vector<std::string> &filenames, const char *args, int repeate )
+{
+    JiEvent event;
+    JiImageInfo * images = new JiImageInfo[filenames.size()];
+    JiImageInfo *outImage = nullptr;
+    for(int i = 0; i < filenames.size(); ++i)
+    {
+    	cv::Mat inMat = cv::imread(filenames[i]);
+        if (inMat.empty())
+        {
+            LOG(ERROR) << "[ERROR] cv::imread source file failed, " << filenames[i];
+            delete[] images;
+            return JISDK_RET_INVALIDPARAMS;
+        }
+
+        images[i].nWidth = inMat.cols;
+        images[i].nHeight = inMat.rows;
+        images[i].nWidthStride = inMat.cols;
+        images[i].nHeightStride = inMat.rows;
+        images[i].nFormat = JI_IMAGE_TYPE_BGR;
+        images[i].nDataLen = inMat.total();
+        images[i].pData = inMat.data;
+        images[i].nDataType = JI_UNSIGNED_CHAR;
+    }
+
+    int nRepeats = (repeate <= 0) ? 1 : repeate;
+
+    int count = 0;
+    while (++count <= nRepeats)
+    {
+        if (m_isAsyn == true)
+        {
+            if (m_inferenceSize == 0)
+            {
+                m_inferenceSize = nRepeats;
+                m_runFlag = true;
+                std::thread newThread([&]
+                                      { run(); });
+                m_thread.swap(newThread);
+            }
+
+            EvData *userData = new EvData;
+            userData->index = count;
+            userData->inferenceType = 0;
+            userData->obj = this;
+            LOG(INFO) << "Call asyn " << count;
+            ProcessOneFrameAsyn(images, args, userData);
+            continue;
+        }
+
+        if (ProcessOneFrame(images, args, &outImage, event))
+        {
+            LOG(INFO) << "event info:"
+                      << "\n\tcode: " << event.code
+                      << "\n\tjson: " << event.json;
+
+            if (event.code != JISDK_CODE_FAILED)
+            {
+                if (outImage != nullptr && !m_outFile.empty())
+                {
+                    if (outImage[0].nFormat == JI_IMAGE_TYPE_BGR && outImage[0].nDataType == JI_UNSIGNED_CHAR)
+                    {
+                        cv::Mat outMat(outImage[0].nHeight, outImage[0].nWidth, CV_8UC3, outImage[0].pData);
+                        cv::imwrite(m_outFile, outMat);
+                        LOG(INFO) << "write out image successfully.";
+                    }
+                    LOG(INFO) << "get out size : " << m_outSize;
+                    for(int i = 1 ; i < m_outSize; ++i)
+                    {
+                        if (outImage[i].nFormat == JI_IMAGE_TYPE_BGR && outImage[i].nDataType == JI_UNSIGNED_CHAR)
+                        {
+                            cv::Mat tmpMat = cv::Mat(outImage[i].nHeight, outImage[i].nWidth, CV_8UC3, outImage[i].pData).clone();
+                            std::string picName = "/usr/local/ev_sdk/bin/index_" + std::to_string(i) +  ".jpg";
+                            cv::imwrite(picName, tmpMat);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    delete[] images;
+    return true;
+
+}
+
 bool Algo::ProcessImage(const std::string &filename, const char *args, int repeate)
 {
     JiEvent event;
-    cv::Mat inMatCopy;
     cv::Mat inMat = cv::imread(filename);
     if (inMat.empty())
     {
@@ -68,18 +165,16 @@ bool Algo::ProcessImage(const std::string &filename, const char *args, int repea
         return JISDK_RET_INVALIDPARAMS;
     }
 
-    Mat_BGR2YUV_nv12(inMat,inMatCopy);
-
     JiImageInfo image[1];
     JiImageInfo *outImage = nullptr;
 
     image[0].nWidth = inMat.cols;
     image[0].nHeight = inMat.rows;
-    image[0].nWidthStride = inMatCopy.cols;
-    image[0].nHeightStride = inMatCopy.rows * 2 / 3;
-    image[0].nFormat = JI_IMAGE_TYPE_YUV420;
-    image[0].nDataLen = inMatCopy.total();
-    image[0].pData = inMatCopy.data;
+    image[0].nWidthStride = inMat.cols;
+    image[0].nHeightStride = inMat.rows;
+    image[0].nFormat = JI_IMAGE_TYPE_BGR;
+    image[0].nDataLen = inMat.total();
+    image[0].pData = inMat.data;
     image[0].nDataType = JI_UNSIGNED_CHAR;
 
     int nRepeats = (repeate <= 0) ? 1 : repeate;
@@ -123,6 +218,16 @@ bool Algo::ProcessImage(const std::string &filename, const char *args, int repea
                         cv::imwrite(m_outFile, outMat);
                         LOG(INFO) << "write out image successfully.";
                     }
+                    LOG(INFO) << "get out size : " << m_outSize;
+                    for(int i = 1 ; i < m_outSize; ++i)
+                    {
+                        if (outImage[i].nFormat == JI_IMAGE_TYPE_BGR && outImage[i].nDataType == JI_UNSIGNED_CHAR)
+                        {
+                            cv::Mat tmpMat = cv::Mat(outImage[i].nHeight, outImage[i].nWidth, CV_8UC3, outImage[i].pData).clone();
+                            std::string picName = "/usr/local/ev_sdk/bin/index_" + std::to_string(i) +  ".jpg";
+                            cv::imwrite(picName, tmpMat);
+                        }
+                    }
                 }
             }
         }
@@ -146,7 +251,7 @@ bool Algo::ProcessVideo(const std::string &filename, const char *args, int repea
         }
 
         cv::VideoWriter vwriter;
-        cv::Mat inMatCopy;
+
         cv::Mat inMat;
         JiEvent event;
         while (vcapture.read(inMat))
@@ -159,15 +264,14 @@ bool Algo::ProcessVideo(const std::string &filename, const char *args, int repea
 
             JiImageInfo image[1];
             JiImageInfo *outImage = nullptr;
-            Mat_BGR2YUV_nv12(inMat,inMatCopy);
 
             image[0].nWidth = inMat.cols;
             image[0].nHeight = inMat.rows;
-            image[0].nWidthStride = inMatCopy.cols;
-            image[0].nHeightStride = inMatCopy.rows * 2 / 3;
-            image[0].nFormat = JI_IMAGE_TYPE_YUV420;
-            image[0].nDataLen = inMatCopy.total();
-            image[0].pData = inMatCopy.data;
+            image[0].nWidthStride = inMat.cols;
+            image[0].nHeightStride = inMat.rows;
+            image[0].nFormat = JI_IMAGE_TYPE_BGR;
+            image[0].nDataLen = inMat.total();
+            image[0].pData = inMat.data;
             image[0].nDataType = JI_UNSIGNED_CHAR;
 
             if (m_isAsyn == true)
@@ -223,7 +327,7 @@ bool Algo::ProcessOneFrame(const JiImageInfo *pInFrames, const char *args, JiIma
 {
     auto start = std::chrono::high_resolution_clock::now();
     unsigned int outSize = 0;
-    JiErrorCode ret = ji_calc_image(m_predictor, pInFrames, 1, args, pOutFrames, outSize, event);
+    JiErrorCode ret = ji_calc_image(m_predictor, pInFrames, 1, args, pOutFrames, m_outSize, event);
     if (ret != JISDK_RET_SUCCEED)
     {
         LOG(INFO) << "ji_calc_image error, return " << ret;
@@ -306,27 +410,39 @@ void AlgoCallback(JiData *output, void *userData)
 }
 
 
-
 bool Algo::FaceInit()
-{     
-    LOG(INFO) << " not implemented ";
+{
+/*
+    std::string face_db_black = "/tmp/black_list";
+    JiErrorCode ret =  ji_face_init(m_predictor,g_db_path.c_str(),face_db_black.c_str());
+    LOG(INFO) << "FaceInit return " << ret;
     return true;
+*/
 }
 
 bool Algo::FaceInsert(const std::string &fileanme)
-{    
-    LOG(INFO) << " not implemented ";
+{
+/*  
+    JiErrorCode ret = ji_face_insert(m_predictor,fileanme.c_str(),g_lib_id);
+    LOG(INFO) << "FaceInsert return " << ret;
     return true;
+*/
 }
 
 bool Algo::FaceDelete(const std::string &faceId)
-{ 
-    LOG(INFO) << " not implemented ";
+{
+/*    
+    JiErrorCode ret = ji_face_delete(m_predictor,faceId.c_str(),g_lib_id);
+    LOG(INFO) << "FaceInsert return " << ret;
     return true;
+*/
 }
 
 bool Algo::FaceDbExport()
-{ 
-    LOG(INFO) << " not implemented ";
+{
+/*
+    JiErrorCode ret = ji_face_exportDB(m_predictor,g_db_path.c_str(),g_lib_id);
+    LOG(INFO) << "FaceDbExport return " << ret;
     return true;   
+*/
 }

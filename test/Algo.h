@@ -18,8 +18,9 @@ public:
     Algo();
     ~Algo();
     bool Init(const int &type = 0);
-
+    bool SetConfig(const char *args);
     bool ProcessImage(const std::string &filename, const char *args, int repeate = 0);
+    bool ProcessImages(const std::vector<std::string> &filenames, const char *args, int repeate = 0);
     bool ProcessVideo(const std::string &filename, const char *args, int repeate = 0);
     bool ProcessStream(const std::string &url);
 
@@ -46,10 +47,13 @@ private:
     int m_inferenceCount = 0;
     int m_inferenceSize = 0;
 
+    unsigned int m_outSize = 0;
+
 private:
     void *m_predictor = nullptr;
     bool m_isAsyn = false;
     std::string m_outFile;
+
 
 };
 
