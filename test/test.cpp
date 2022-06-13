@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <opencv2/opencv.hpp>
 #include <glog/logging.h>
-
+#include "acl/acl.h"
 #include "Algo.h"
 
 using namespace std;
@@ -322,6 +322,22 @@ void test_ji_delete_face()
     return;
 }
 
+bool atlasInit()
+{
+    const char *aclConfigPath = "/usr/local/ev_sdk/config/acl.json";
+    aclError ret = aclInit(aclConfigPath);
+    if (ret != ACL_ERROR_NONE)
+    {
+        LOG(ERROR) << "Acl init failed";
+        return false;
+    }
+
+    LOG(INFO) << "Acl init success";
+
+    return true;
+}
+
+
 int main(int argc, char *argv[])
 {
     google::InitGoogleLogging(argv[0]);
@@ -450,6 +466,10 @@ int main(int argc, char *argv[])
               << "\n\toutfile: " << strOut
               << "\n\trepeat:" << repeats;
     ji_init(argc,argv);
+     if(!atlasInit())
+    {
+        return 0;
+    }
     switch (command)
     {
         case CMD::ji_calc_image:

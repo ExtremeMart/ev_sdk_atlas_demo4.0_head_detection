@@ -75,23 +75,29 @@ bool Algo::ProcessImages(const std::vector<std::string> &filenames, const char *
     JiEvent event;
     JiImageInfo * images = new JiImageInfo[filenames.size()];
     JiImageInfo *outImage = nullptr;
+
+    std::vector<cv::Mat> inMatCopys;
     for(int i = 0; i < filenames.size(); ++i)
     {
     	cv::Mat inMat = cv::imread(filenames[i]);
+        cv::Mat inMatCopy;
+	inMatCopys.push_back(inMatCopy.clone());
         if (inMat.empty())
         {
             LOG(ERROR) << "[ERROR] cv::imread source file failed, " << filenames[i];
             delete[] images;
             return JISDK_RET_INVALIDPARAMS;
         }
+        Mat_BGR2YUV_nv12(inMat,inMatCopys[i]);
+
 
         images[i].nWidth = inMat.cols;
         images[i].nHeight = inMat.rows;
-        images[i].nWidthStride = inMat.cols;
-        images[i].nHeightStride = inMat.rows;
-        images[i].nFormat = JI_IMAGE_TYPE_BGR;
-        images[i].nDataLen = inMat.total();
-        images[i].pData = inMat.data;
+        images[i].nWidthStride = inMatCopys[i].cols;
+        images[i].nHeightStride = inMatCopys[i].rows * 2 / 3;
+        images[i].nFormat = JI_IMAGE_TYPE_YUV420;
+        images[i].nDataLen = inMatCopys[i].total();
+        images[i].pData = inMatCopys[i].data;
         images[i].nDataType = JI_UNSIGNED_CHAR;
     }
 
@@ -159,22 +165,23 @@ bool Algo::ProcessImage(const std::string &filename, const char *args, int repea
 {
     JiEvent event;
     cv::Mat inMat = cv::imread(filename);
+    cv::Mat inMatCopy;
     if (inMat.empty())
     {
         LOG(ERROR) << "[ERROR] cv::imread source file failed, " << filename;
         return JISDK_RET_INVALIDPARAMS;
     }
 
+    Mat_BGR2YUV_nv12(inMat,inMatCopy);
     JiImageInfo image[1];
     JiImageInfo *outImage = nullptr;
-
     image[0].nWidth = inMat.cols;
     image[0].nHeight = inMat.rows;
-    image[0].nWidthStride = inMat.cols;
-    image[0].nHeightStride = inMat.rows;
-    image[0].nFormat = JI_IMAGE_TYPE_BGR;
-    image[0].nDataLen = inMat.total();
-    image[0].pData = inMat.data;
+    image[0].nWidthStride = inMatCopy.cols;
+    image[0].nHeightStride = inMatCopy.rows * 2 / 3;
+    image[0].nFormat = JI_IMAGE_TYPE_YUV420;
+    image[0].nDataLen = inMatCopy.total();
+    image[0].pData = inMatCopy.data;
     image[0].nDataType = JI_UNSIGNED_CHAR;
 
     int nRepeats = (repeate <= 0) ? 1 : repeate;
