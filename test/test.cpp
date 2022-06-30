@@ -56,16 +56,14 @@ int check_filetype(const string &filename)
             strExt.compare(".rmvb") == 0)
         {
             filetype = 1;
-        }
-
-        struct stat buff;
-        int result = stat(filename.c_str(), &buff);
-        if( (result == 0) && (buff.st_mode&S_IFMT) == S_IFDIR)
-        {
-            filetype = 2;
-        }
+        }        
     }
-
+    struct stat buff;
+    int result = stat(filename.c_str(), &buff);
+    if( (result == 0) && (buff.st_mode&S_IFMT) == S_IFDIR)
+    {
+        filetype = 2;
+    }
     return filetype;
 }
 
@@ -170,7 +168,8 @@ bool test_for_ji_calc_image()
         {
             LOG(ERROR) << "path not exists : " << strIn;
             return false;
-        }        
+        }
+        std::vector<std::string> vecImgNames{};       
         while( (ptr = readdir(pDir))!=0 )
         {
             if(check_filetype(ptr->d_name) == 0)
@@ -181,13 +180,18 @@ bool test_for_ji_calc_image()
                     filename = filename +'/';
                 }
                 filename = filename + ptr->d_name;
-                LOG(INFO) << "process image : " << filename;
-                size_t sep = filename.rfind('.');
-                std::string outname = filename.substr(0,sep) + "_result" + filename.substr(sep);
-                algoInstance.SetOutFileName(outname);
-                algoInstance.ProcessImage(filename, EMPTY_EQ_NULL(strArgs), repeats);
+                vecImgNames.push_back(filename);                
             }
-        }        
+        }
+        for(int i = 0; i < vecImgNames.size(); ++i)        
+        {
+            auto filename = vecImgNames[i];
+            LOG(INFO) << "process image : " << filename;
+            size_t sep = filename.rfind('.');
+            std::string outname = filename.substr(0,sep) + "_result" + filename.substr(sep);
+            algoInstance.SetOutFileName(outname);
+            algoInstance.ProcessImage(filename, EMPTY_EQ_NULL(strArgs), repeats);
+        }
     }
     return true;
 }
