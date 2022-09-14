@@ -268,7 +268,7 @@ bool Algo::ProcessVideo(const std::string &filename, const char *args, int repea
                 LOG(ERROR) << "cv::imread source file failed, " << filename;
                 return false;
             }
-
+            cv::Mat inMatCopy;
             JiImageInfo image[1];
             JiImageInfo *outImage = nullptr;
             Mat_BGR2YUV_nv12(inMat,inMatCopy);
