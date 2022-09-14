@@ -271,14 +271,15 @@ bool Algo::ProcessVideo(const std::string &filename, const char *args, int repea
 
             JiImageInfo image[1];
             JiImageInfo *outImage = nullptr;
+            Mat_BGR2YUV_nv12(inMat,inMatCopy);
 
             image[0].nWidth = inMat.cols;
             image[0].nHeight = inMat.rows;
-            image[0].nWidthStride = inMat.cols;
-            image[0].nHeightStride = inMat.rows;
-            image[0].nFormat = JI_IMAGE_TYPE_BGR;
-            image[0].nDataLen = inMat.total();
-            image[0].pData = inMat.data;
+            image[0].nWidthStride = inMatCopy.cols;
+            image[0].nHeightStride = inMatCopy.rows * 2 / 3;
+            image[0].nFormat = JI_IMAGE_TYPE_YUV420;
+            image[0].nDataLen = inMatCopy.total();
+            image[0].pData = inMatCopy.data;
             image[0].nDataType = JI_UNSIGNED_CHAR;
 
             if (m_isAsyn == true)
