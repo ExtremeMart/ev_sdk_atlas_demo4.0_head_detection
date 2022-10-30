@@ -235,6 +235,14 @@ STATUS SampleDetector::UnInit()
 
 STATUS SampleDetector::ProcessImage(const JiImageInfo &inFrame, std::vector<BoxInfo> &result, float thresh)
 {    
+     // set current context
+    auto ret = aclrtSetCurrentContext(mAclContext);
+    if (ret != ACL_ERROR_NONE)
+    {
+        SDKLOG(ERROR) << "acl set context failed! aclError= " << ret;
+        return ERROR_INITACL;
+    }
+    
     mThresh = thresh;
     mInputHeight = inFrame.nHeight;
     mInputWidth = inFrame.nWidth;
