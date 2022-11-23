@@ -175,7 +175,14 @@ STATUS SampleDetector::UnInit()
     if(mInitialized == false)
     {
         return STATUS_SUCCESS;    
-    }    
+    }  
+    acldvppDestroyResizeConfig(mDvppResizeConfPtr);
+    acldvppDestroyPicDesc(mDvppCopyPasteOutPicConfPtr);
+    acldvppDestroyPicDesc(mDvppCopyPasteInPicConfptr);
+    acldvppDestroyPicDesc(mDvppResizeOutPicConfPtr);
+    acldvppDestroyPicDesc(mDvppResizeInPicConfPtr);
+    acldvppDestroyChannel(mDVPPChnDescPtr);
+    acldvppDestroyChannelDesc(mDVPPChnDescPtr);     
     SDKLOG(INFO) << "in uninit func";
     // 释放输入数据集
     if(mInputDatasetPtr != nullptr)
@@ -360,6 +367,8 @@ STATUS SampleDetector::PreProcess(const JiImageInfo &inFrame)
     acldvppFree(inputData);    
     acldvppFree(resizeData);  
 
+    acldvppDestroyRoiConfig(mDvppCropConf);
+    acldvppDestroyRoiConfig(mDvppPasteConf);
     return STATUS_SUCCESS;
 }
 
